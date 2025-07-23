@@ -63,12 +63,17 @@ class Lobby:
 
 class BoardingLine:
     def __init__(self, num_of_rows):
-        # Initialize the aisle
         self.num_of_rows = num_of_rows
-        self.line = [None for i in range(num_of_rows)]
+        self.max_length = num_of_rows * 2  # Set a reasonable upper bound
+        self.line = [None for _ in range(num_of_rows)]
+
     
     def add_passenger(self, passenger):
+    if len(self.line) < self.max_length:
         self.line.append(passenger)
+    else:
+        print("⚠️ Boarding line is full! Passenger not added.")
+
     
     def is_onboarding(self):
         if(len(self.line) > 0 and not all(passenger is None for passenger in self.line)):     # error - Passenger instead of passenger
@@ -283,10 +288,11 @@ class AirplaneEnv(gym.Env):
             print()
         
         print("\nLine entering plane:")
-        for i in range(self.num_of_rows, len(self.boarding_line.line)):
-            passenger = self.boarding_line.line[i]
-            
-            print(f"{passenger} {passenger.status}")
+       max_display = min(len(self.boarding_line.line), self.boarding_line.max_length)
+for i in range(self.num_of_rows, max_display):
+    passenger = self.boarding_line.line[i]
+    print(f"{passenger} {passenger.status}")
+
         
         print("\nLobby:")
         for row in self.lobby.lobby_rows:
