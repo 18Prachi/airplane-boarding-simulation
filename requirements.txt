@@ -1,0 +1,7 @@
+# To install, paste this in the terminal: pip install -r requirements.txt
+
+gymnasium
+numpy
+pandas
+stable-baselines3
+sb3-contrib
