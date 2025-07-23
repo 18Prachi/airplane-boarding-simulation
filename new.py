@@ -241,7 +241,8 @@ class AirplaneEnv(gym.Env):
         return self._get_observation(), reward, terminated, False, {}
 
     def _calculate_reward(self):
-        reward = -self.boarding_line.num_passengers_stalled() #+ self.boarding_line.num_passengers_moving()
+       reward = -self.boarding_line.num_passengers_stalled() + self.boarding_line.num_passengers_moving()
+
         return reward
 
     def is_onboarding(self):
