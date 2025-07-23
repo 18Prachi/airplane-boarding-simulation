@@ -241,8 +241,13 @@ class AirplaneEnv(gym.Env):
         return self._get_observation(), reward, terminated, False, {}
 
     def _calculate_reward(self):
-        reward = -self.boarding_line.num_passengers_stalled() #+ self.boarding_line.num_passengers_moving()
-        return reward
+        try:
+            stalled = self.boarding_line.num_passengers_stalled()
+            moving = self.boarding_line.num_passengers_moving()
+            return -stalled + moving
+        except Exception as e:
+            print(f"Reward calculation error: {e}")
+            return 0  # Default neutral reward
 
     def is_onboarding(self):
         # If there are passengers in the lobby or in the boarding line, return True
