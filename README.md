@@ -1,4 +1,3 @@
-# ✈️ Airplane Boarding Simulation
 
 This project simulates the airplane boarding process using Reinforcement Learning (RL). The goal is to model and improve the boarding sequence in a way that reduces overall boarding time and congestion.
 
