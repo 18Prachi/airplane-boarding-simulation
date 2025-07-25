@@ -1,5 +1,6 @@
 import gymnasium as gym
 from gymnasium import spaces
+import time,random
 from gymnasium.envs.registration import register
 from enum import Enum
 import numpy as np
@@ -128,6 +129,8 @@ class Seat:
         if passenger.is_holding_luggage:
             # passenger starts stowing 
             passenger.status = PassengerStatus.STOWING
+            # simulates delay in stowing luggage
+            time.sleep(random.uniform(0.5, 2.0))
             passenger.is_holding_luggage = False
             return False
         else:
