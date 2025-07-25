@@ -3,6 +3,7 @@ from gymnasium import spaces
 from gymnasium.envs.registration import register
 from enum import Enum
 import numpy as np
+import logging
 
 # Register this module as a gym environment. Once registered, the id is usable in gym.make().
 # When running this code, you can ignore this warning: "UserWarning: WARN: Overriding environment airplane-boarding-v0 already in registry."
@@ -115,6 +116,12 @@ class BoardingLine:
             if self.line[i] is None:
                 self.line.pop(i)
 
+class SeatAssignmentError(Exception):
+    pass
+
+class LuggageStowingError(SeatAssignmentError):
+    pass
+
 class Seat:
     def __init__(self, seat_num, row_num):
         self.seat_num = seat_num
@@ -123,18 +130,21 @@ class Seat:
 
     # Attempt to sit passenger
     def seat_passenger(self, passenger: Passenger):
-
-        assert self.seat_num == passenger.seat_num, "Seat number does not match Passenger's seat number"
+        if self.seat_num != passenger.seat_num:
+            logging.error(f"Seat assignment failed: Seat {self.seat_num} does not match Passenger {passenger.seat_num}.")
+            raise SeatAssignmentError("Seat number does not match Passenger's seat number")
 
         if passenger.is_holding_luggage:
             # Passenger starts Stowing luggage
             passenger.status = PassengerStatus.STOWING
             passenger.is_holding_luggage = False
-            return False
+            logging.info(f"Passenger {passenger.seat_num} is stowing luggage before seating.")
+            raise LuggageStowingError("Passenger is stowing luggage before seating.")
         else:
             # Sit passenger in seat
             self.passenger = passenger
             self.passenger.status = PassengerStatus.SEATED
+            logging.info(f"Passenger {passenger.seat_num} successfully seated in seat {self.seat_num}.")
             return True
 
     def __str__(self):
@@ -154,10 +164,17 @@ class AirplaneRow:
         found_seats = list(filter(lambda seats: seats.seat_num == passenger.seat_num, self.seats))
 
         if found_seats:
-            found_seat: Seat = found_seats[0]
-            return found_seat.seat_passenger(passenger)
-
-        return False
+            try:
+                found_seat: Seat = found_seats[0]
+                return found_seat.seat_passenger(passenger)
+            except SeatAssignmentError as e:
+                logging.error(f"Failed to seat passenger {passenger.seat_num} in row {self.row_num}: {e}")
+                raise
+            except LuggageStowingError as e:
+                logging.info(f"Passenger {passenger.seat_num} in row {self.row_num} is stowing luggage: {e}")
+                raise
+        logging.error(f"Passenger {passenger.seat_num} seat not found in row {self.row_num}.")
+        raise SeatAssignmentError("Passenger's seat not found in this row.")
 
 
 class AirplaneEnv(gym.Env):
@@ -215,7 +232,8 @@ class AirplaneEnv(gym.Env):
         return np.array(observation, dtype=np.int32)
 
     def step(self, row_num):
-        assert row_num>=0 and row_num<self.num_of_rows, f"Invalid row number {row_num}"
+        if not (0 <= row_num < self.num_of_rows):
+            raise ValueError(f"Invalid row number {row_num}")
 
         reward = 0
 
@@ -327,33 +345,42 @@ def my_check_env():
     env = gym.make('airplane-boarding-v0', render_mode=None)
     check_env(env.unwrapped)
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+
 if __name__ == "__main__":
     # my_check_env()
 
-    env = gym.make('airplane-boarding-v0', num_of_rows=3, seats_per_row=5, render_mode='terminal')
+    try:
+        env = gym.make('airplane-boarding-v0', num_of_rows=3, seats_per_row=5, render_mode='terminal')
 
-    observation, _ = env.reset()
-    terminated = False
-    total_reward = 0
-    step_count = 0
+        observation, _ = env.reset()
+        terminated = False
+        total_reward = 0
+        step_count = 0
 
-    while not terminated:
-        # Choose random action
-        action = env.action_space.sample()
+        while not terminated:
+            try:
+                # Choose random action
+                action = env.action_space.sample()
 
-        # Skip action if invalid
-        masks = env.unwrapped.action_masks()
-        if(masks[action]==False):
-            continue
+                # Skip action if invalid
+                masks = env.unwrapped.action_masks()
+                if(masks[action]==False):
+                    continue
 
-        # Perform action
-        observation, reward, terminated, _, _ = env.step(action)
-        total_reward += reward
+                # Perform action
+                observation, reward, terminated, _, _ = env.step(action)
+                total_reward += reward
 
-        step_count+=1
+                step_count+=1
 
-        print(f"Step {step_count} Action: {action}")
-        print(f"Observation: {observation}")
-        print(f"Reward: {reward}\n")
+                print(f"Step {step_count} Action: {action}")
+                print(f"Observation: {observation}")
+                print(f"Reward: {reward}\n")
+            except Exception as e:
+                logging.error(f"Error during step: {e}", exc_info=True)
+                break
 
-    print(f"Total Reward: {total_reward}")
+        print(f"Total Reward: {total_reward}")
+    except Exception as e:
+        logging.critical(f"Error in main execution: {e}", exc_info=True)

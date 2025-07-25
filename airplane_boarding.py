@@ -3,6 +3,7 @@ from gymnasium import spaces
 from gymnasium.envs.registration import register
 from enum import Enum
 import numpy as np
+import logging
 
 # Register the module as gym env
 register(
@@ -30,6 +31,10 @@ class PassengerStatus(Enum):
 
 class Passenger:
     def __init__(self, seat_num, row_num):
+        if not isinstance(seat_num, int) or seat_num < 0:
+            raise ValueError(f"Invalid seat_num: {seat_num}")
+        if not isinstance(row_num, int) or row_num < 0:
+            raise ValueError(f"Invalid row_num: {row_num}")
         self.seat_num = seat_num
         self.row_num = row_num
         self.is_holding_luggage = True
@@ -41,11 +46,19 @@ class Passenger:
 
 class LobbyRow:
     def __init__(self, row_num, seats_per_row):
+        if not isinstance(row_num, int) or row_num < 0:
+            raise ValueError(f"Invalid row_num: {row_num}")
+        if not isinstance(seats_per_row, int) or seats_per_row <= 0:
+            raise ValueError(f"Invalid seats_per_row: {seats_per_row}")
         self.row_num = row_num
         self.passengers = [Passenger(row_num * seats_per_row + i, row_num) for i in range(seats_per_row)]
 
 class Lobby:
     def __init__(self, num_of_rows, seats_per_row):
+        if not isinstance(num_of_rows, int) or num_of_rows <= 0:
+            raise ValueError(f"Invalid num_of_rows: {num_of_rows}")
+        if not isinstance(seats_per_row, int) or seats_per_row <= 0:
+            raise ValueError(f"Invalid seats_per_row: {seats_per_row}")
         self.num_of_rows = num_of_rows
         self.seats_per_row = seats_per_row
         self.lobby_rows = [LobbyRow(row_num, self.seats_per_row) for row_num in range(self.num_of_rows)]
@@ -63,15 +76,19 @@ class Lobby:
 
 class BoardingLine:
     def __init__(self, num_of_rows):
+        if not isinstance(num_of_rows, int) or num_of_rows <= 0:
+            raise ValueError(f"Invalid num_of_rows: {num_of_rows}")
         # Initialize the aisle
         self.num_of_rows = num_of_rows
         self.line = [None for i in range(num_of_rows)]
     
     def add_passenger(self, passenger):
+        if not isinstance(passenger, Passenger):
+            raise TypeError("Only Passenger instances can be added to the boarding line.")
         self.line.append(passenger)
     
     def is_onboarding(self):
-        if(len(self.line) > 0 and not all(passenger is None for passenger in self.line)):     # error - Passenger instead of passenger
+        if(len(self.line) > 0 and not all(passenger is None for passenger in self.line)):
             return True
         
         return False
@@ -116,14 +133,21 @@ class BoardingLine:
 
 class Seat:
     def __init__(self, seat_num, row_num):
+        if not isinstance(seat_num, int) or seat_num < 0:
+            raise ValueError(f"Invalid seat_num: {seat_num}")
+        if not isinstance(row_num, int) or row_num < 0:
+            raise ValueError(f"Invalid row_num: {row_num}")
         self.seat_num = seat_num
         self.row_num = row_num
         self.passenger = None
     
     # Attempt to sit passenger
     def seat_passenger(self, passenger: Passenger):
+        if not isinstance(passenger, Passenger):
+            raise TypeError("Only Passenger instances can be seated.")
 
-        assert self.seat_num == passenger.seat_num, "Seat number does not match Passenger's seat number"
+        if self.seat_num != passenger.seat_num:
+            raise SeatAssignmentError("Seat number does not match Passenger's seat number")
 
         if passenger.is_holding_luggage:
             # passenger starts stowing 
@@ -144,10 +168,16 @@ class Seat:
         
 class AirplaneRow:
     def __init__(self, row_num, seats_per_row):
+        if not isinstance(row_num, int) or row_num < 0:
+            raise ValueError(f"Invalid row_num: {row_num}")
+        if not isinstance(seats_per_row, int) or seats_per_row <= 0:
+            raise ValueError(f"Invalid seats_per_row: {seats_per_row}")
         self.row_num = row_num
         self.seats = [Seat(row_num*seats_per_row+i, row_num) for i in range(seats_per_row)]
     
     def try_sit_passenger(self, passenger:Passenger):
+        if not isinstance(passenger, Passenger):
+            raise TypeError("Only Passenger instances can be seated.")
         # Check if the passenger's seat is in this row
         found_seats = list(filter(lambda seats: seats.seat_num == passenger.seat_num, self.seats))
 
@@ -161,6 +191,10 @@ class AirplaneEnv(gym.Env):
     metadata = {'render_modes': ['human', 'terminal'], 'render_fps': 1}
 
     def __init__(self, render_mode=None, num_of_rows=3, seats_per_row=5):
+        if not isinstance(num_of_rows, int) or num_of_rows <= 0:
+            raise ValueError(f"Invalid num_of_rows: {num_of_rows}")
+        if not isinstance(seats_per_row, int) or seats_per_row <= 0:
+            raise ValueError(f"Invalid seats_per_row: {seats_per_row}")
         self.seats_per_row = seats_per_row
         self.num_of_rows = num_of_rows
         self.num_of_seats = num_of_rows * seats_per_row
@@ -210,7 +244,8 @@ class AirplaneEnv(gym.Env):
         return np.array(observation, dtype=np.int32)
     
     def step(self, row_num):
-        assert row_num >= 0 and row_num < self.num_of_rows, f"Invalid row number {row_num}"
+        if not (0 <= row_num < self.num_of_rows):
+            raise ValueError(f"Invalid row number {row_num}")
 
         reward = 0
         passenger = self.lobby.remove_passenger(row_num)
@@ -309,37 +344,43 @@ class AirplaneEnv(gym.Env):
                 mask.append(True)
         return mask
 
+class SeatAssignmentError(Exception):
+    pass
+
 # Check validity of the environment
 def check_my_env():
     from gymnasium.utils.env_checker import check_env
     env = gym.make('airplane-boarding-v0', render_mode=None)
     check_env(env.unwrapped)
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+
 if __name__ == "__main__":
-    env = gym.make('airplane-boarding-v0', num_of_rows=10, seats_per_row=5, render_mode='terminal')
-
-    observation, _= env.reset()
-    terminated = False
-    total_reward = 0
-    step_count = 0
-
-    while not terminated:
-        # Choose random action
-        action = env.action_space.sample()
-
-        # Skip action if invalid
-        masks = env.unwrapped.action_masks()
-        if(masks[action] == False):
-            continue
-        
-        # Perform action
-        observation, reward, terminated, _, _ = env.step(action)
-        total_reward += reward
-
-        step_count += 1
-
-        print(f"Step {step_count} Action: {action}")
-        print(f"Observation: {observation}")
-        print(f"Reward: {reward}\n")
-    
-    print(f"Total Reward: {total_reward}")
+    # my_check_env()
+    try:
+        env = gym.make('airplane-boarding-v0', num_of_rows=10, seats_per_row=5, render_mode='terminal')
+        observation, _ = env.reset()
+        terminated = False
+        total_reward = 0
+        step_count = 0
+        while not terminated:
+            try:
+                # Choose random action
+                action = env.action_space.sample()
+                # Skip action if invalid
+                masks = env.unwrapped.action_masks()
+                if(masks[action]==False):
+                    continue
+                # Perform action
+                observation, reward, terminated, _, _ = env.step(action)
+                total_reward += reward
+                step_count+=1
+                print(f"Step {step_count} Action: {action}")
+                print(f"Observation: {observation}")
+                print(f"Reward: {reward}\n")
+            except Exception as e:
+                logging.error(f"Error during step: {e}", exc_info=True)
+                break
+        print(f"Total Reward: {total_reward}")
+    except Exception as e:
+        logging.critical(f"Error in main execution: {e}", exc_info=True)

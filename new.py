@@ -3,6 +3,7 @@ from gymnasium import spaces
 from gymnasium.envs.registration import register
 from enum import Enum
 import numpy as np
+import logging
 
 # Register this module as a gym environment. Once registered, the id is usable in gym.make().
 # When running this code, you can ignore this warning: "UserWarning: WARN: Overriding environment airplane-boarding-v0 already in registry."
@@ -124,7 +125,8 @@ class Seat:
     # Attempt to sit passenger
     def seat_passenger(self, passenger: Passenger):
 
-        assert self.seat_num == passenger.seat_num, "Seat number does not match Passenger's seat number"
+        if self.seat_num != passenger.seat_num:
+            raise SeatAssignmentError("Seat number does not match Passenger's seat number")
 
         if passenger.is_holding_luggage:
             # Passenger starts Stowing luggage
@@ -215,7 +217,8 @@ class AirplaneEnv(gym.Env):
         return np.array(observation, dtype=np.int32)
 
     def step(self, row_num):
-        assert row_num>=0 and row_num<self.num_of_rows, f"Invalid row number {row_num}"
+        if not (0 <= row_num < self.num_of_rows):
+            raise ValueError(f"Invalid row number {row_num}")
 
         reward = 0
 
@@ -329,31 +332,31 @@ def my_check_env():
 
 if __name__ == "__main__":
     # my_check_env()
-
-    env = gym.make('airplane-boarding-v0', num_of_rows=10, seats_per_row=5, render_mode='terminal')
-
-    observation, _ = env.reset()
-    terminated = False
-    total_reward = 0
-    step_count = 0
-
-    while not terminated:
-        # Choose random action
-        action = env.action_space.sample()
-
-        # Skip action if invalid
-        masks = env.unwrapped.action_masks()
-        if(masks[action]==False):
-            continue
-
-        # Perform action
-        observation, reward, terminated, _, _ = env.step(action)
-        total_reward += reward
-
-        step_count+=1
-
-        print(f"Step {step_count} Action: {action}")
-        print(f"Observation: {observation}")
-        print(f"Reward: {reward}\n")
-
-    print(f"Total Reward: {total_reward}")
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s:%(message)s')
+    try:
+        env = gym.make('airplane-boarding-v0', num_of_rows=10, seats_per_row=5, render_mode='terminal')
+        observation, _ = env.reset()
+        terminated = False
+        total_reward = 0
+        step_count = 0
+        while not terminated:
+            try:
+                # Choose random action
+                action = env.action_space.sample()
+                # Skip action if invalid
+                masks = env.unwrapped.action_masks()
+                if(masks[action]==False):
+                    continue
+                # Perform action
+                observation, reward, terminated, _, _ = env.step(action)
+                total_reward += reward
+                step_count+=1
+                print(f"Step {step_count} Action: {action}")
+                print(f"Observation: {observation}")
+                print(f"Reward: {reward}\n")
+            except Exception as e:
+                logging.error(f"Error during step: {e}", exc_info=True)
+                break
+        print(f"Total Reward: {total_reward}")
+    except Exception as e:
+        logging.critical(f"Error in main execution: {e}", exc_info=True)
