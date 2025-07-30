@@ -113,7 +113,20 @@ class BoardingLine:
         for i in range(len(self.line)-1, self.num_of_rows-1, -1):
             if self.line[i] is None:
                 self.line.pop(i)
+# Add this test right after your BoardingLine class definition
+def test_boarding_line():
+    line = BoardingLine(3)
+    p1 = Passenger(1, 0)
+    p2 = Passenger(2, 0)
+    line.line = [None, p1, p2]
+    p1.status = PassengerStatus.MOVING
+    p2.status = PassengerStatus.STALLED
+    assert line.num_passengers_moving() == 1
+    assert line.num_passengers_stalled() == 1
+    print("All tests passed!")
 
+if __name__ == "__main__":
+    test_boarding_line()
 class Seat:
     def __init__(self, seat_num, row_num):
         self.seat_num = seat_num
@@ -235,8 +248,13 @@ class AirplaneEnv(gym.Env):
         return self._get_observation(), reward, terminated, False, {}
     
     def _calculate_reward(self):
-        reward = -self.boarding_line.num_passengers_stalled() + self.boarding_line.num_passengers_moving
-        return reward
+        try:
+            stalled = self.boarding_line.num_passengers_stalled()
+            moving = self.boarding_line.num_passengers_moving()
+            return -stalled + moving
+        except Exception as e:
+            print(f"Reward calculation error: {e}")
+            return 0  # Default neutral reward
     
     def is_onboarding(self):
         # If there are passengers in the lobby or in the boarding line, return True
