@@ -76,7 +76,15 @@ class BoardingLine:
             return True
         
         return False
-    
+
+    def num_congested_positions(self):
+        # NEW METHOD: count pairs of passengers directly behind each other
+        count = 0
+        for i in range(1, len(self.line)):
+            if self.line[i] is not None and self.line[i-1] is not None:
+                count += 1
+        return count
+        
     def num_passengers_stalled(self):
         count = 0
         for passenger in self.line:
@@ -91,6 +99,13 @@ class BoardingLine:
             if passenger is not None and passenger.status == PassengerStatus.MOVING:
                 count += 1
             
+        return count
+
+    def num_passengers_seated(self):
+        count = 0
+        for passenger in self.line:
+            if passenger is not None and passenger.status == PassengerStatus.SEATED:
+                count += 1
         return count
     
     def move_forward(self):
@@ -265,11 +280,23 @@ class AirplaneEnv(gym.Env):
         # Gym requires the observation, reward, terminated, truncated and info dictionary
         return self._get_observation(), reward, terminated, False, {}
     
-    def _calculate_reward(self):
-        # Correct code
-        reward = -self.boarding_line.num_passengers_stalled() + self.boarding_line.num_passengers_moving()
+     def _calculate_reward(self):
+        moving = self.boarding_line.num_passengers_moving()
+        stalled = self.boarding_line.num_passengers_stalled()
+        seated = self.boarding_line.num_passengers_seated()  # NEW: Count seated passengers
+        congested = self.boarding_line.num_congested_positions()  # NEW: Count congestion (passengers directly behind each other)
+
+        reward = 0
+        reward += 1.0 * moving                # Encourage moving
+        reward -= 1.0 * stalled               # Penalize stalling
+        reward += 2.0 * seated                # Reward being seated
+        reward -= 2.0 * congested             # Penalize congestion (NEW)
+
+        if not self.is_onboarding():         # NEW: Bonus for finishing onboarding
+            reward += 50.0
+
         return reward
-    
+
     def is_onboarding(self):
         # If there are passengers in the lobby or in the boarding line, return True
         if self.lobby.count_passengers() > 0 or self.boarding_line.is_onboarding():
