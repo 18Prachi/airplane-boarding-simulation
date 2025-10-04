@@ -1,4 +1,8 @@
 gymnasium==0.29.1
-stable-baselines3==2.3.2
-sb3-contrib==2.3.2
+stable-baselines3==2.7.0
+sb3-contrib==2.7.0
 numpy>=1.21.0
+pygame==2.6.1
+numpy>=1.24.0
+matplotlib>=3.7.0
+
