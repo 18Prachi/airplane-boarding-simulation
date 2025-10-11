@@ -191,6 +191,8 @@ class AirplaneEnv(gym.Env):
         self.airplane_rows = [AirplaneRow(row_num, self.seats_per_row) for row_num in range(self.num_of_rows)]
         self.lobby = Lobby(self.num_of_rows, self.seats_per_row)
         self.boarding_line = BoardingLine(self.num_of_rows)
+        #for new feature of step
+        self.current_step = 0
 
         self.render()
 
@@ -215,6 +217,7 @@ class AirplaneEnv(gym.Env):
         return np.array(observation, dtype=np.int32)
 
     def step(self, row_num):
+        self.current_step += 1 #Counting current steps
         assert row_num>=0 and row_num<self.num_of_rows, f"Invalid row number {row_num}"
 
         reward = 0
@@ -250,7 +253,15 @@ class AirplaneEnv(gym.Env):
             return True
 
         return False
-
+    
+    def count_passengers_seated(self):
+        count = 0
+        for row in self.airplane_rows:
+            for seat in row.seats:
+                if seat.passenger is not None and seat.passenger.status == PassengerStatus.SEATED:
+                    count+=1
+        return count
+    
     def _move(self):
 
         for row_num, passenger in enumerate(self.boarding_line.line):
@@ -304,6 +315,14 @@ class AirplaneEnv(gym.Env):
 
             if(len(row.passengers) > 0):
                 print()
+
+        print("\nDebugging Metrics:")
+        print(f"Step: {getattr(self, 'current_step', 0)}")
+        print(f"Passengers stalled: {self.boarding_line.num_passengers_stalled()}")
+        print(f"Passengers seated: {self.count_passengers_seated()}")
+        print(f"Passengers in lobby: {self.lobby.count_passengers()}")
+        if not self.is_onboarding():
+            print(f"Total boarding time: {getattr(self, 'current_step', 0)}")
 
         print("\n")
 
